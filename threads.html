@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>スレッド一覧 - わかくさ掲示板</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body {
+      transition: background-color 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="board-title">📂 スレッド一覧</h1>
+
+  <ul id="thread-list">読み込み中...</ul>
+
+  <hr />
+
+  <h2>＋ 新規スレッド作成</h2>
+  <form id="new-thread-form">
+    <input type="text" id="name" placeholder="名前" required />
+    <input type="text" id="title" placeholder="スレッドタイトル" required />
+    <input type="password" id="password" placeholder="削除用パスワード" required />
+    <button type="submit">作成</button>
+  </form>
+
+  <script>
+    const supabase = supabase.createClient(
+      'https://kdhurulrrehrkyrprufl.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkaHVydWxycmVocmt5cnBydWZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3NzA5OTcsImV4cCI6MjA2NzM0Njk5N30.itwj_uK6GgvyhTvenoTHQSNM-ZAKhjkXI9ffqvpbWVI'
+    );
+
+    const urlParams = new URLSearchParams(location.search);
+    const boardSlug = urlParams.get('board');
+
+    let boardId = null;
+
+    const boardBgColors = {
+      renraku: '#f0f8ff',
+      kyouka: '#fff0f5',
+      zatsudan: '#f5fff0',
+      ruuru: '#ffffe0'
+    };
+
+    function setBackgroundByBoard(slug) {
+      const color = boardBgColors[slug] || '#fff';
+      document.body.style.backgroundColor = color;
+    }
+
+    async function loadBoardInfo() {
+      const { data, error } = await supabase
+        .from('boards')
+        .select('*')
+        .eq('slug', boardSlug)
+        .single();
+
+      if (error || !data) {
+        document.getElementById('board-title').textContent = '板が見つかりません';
+        return;
+      }
+
+      boardId = data.id;
+      document.getElementById('board-title').textContent = `📂 板：${data.name}`;
+
+      setBackgroundByBoard(boardSlug);
+
+      loadThreads();
+    }
+
+    async function loadThreads() {
+      const { data, error } = await supabase
+        .from('threads')
+        .select('*')
+        .eq('board_id', boardId)
+        .order('created_at', { ascending: false });
+
+      const list = document.getElementById('thread-list');
+      list.innerHTML = '';
+
+      if (error || !data.length) {
+        list.innerHTML = '<li>スレッドがありません</li>';
+        return;
+      }
+
+      for (const thread of data) {
+        const li = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = `thread.html?thread=${thread.id}`;
+        link.textContent = `▶ ${thread.title}`;
+        li.appendChild(link);
+        list.appendChild(li);
+      }
+    }
+
+    document.getElementById('new-thread-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const title = document.getElementById('title').value;
+      const password = document.getElementById('password').value;
+
+      if (!boardId) return;
+
+      const { data, error } = await supabase.from('threads').insert([{
+        board_id: boardId,
+        title: title
+      }]);
+
+      if (error) {
+        alert('作成失敗');
+        return;
+      }
+
+      alert('スレッド作成しました');
+      location.reload();
+    });
+
+    loadBoardInfo();
+  </script>
+</body>
+</html>
