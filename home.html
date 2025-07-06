@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>わかくさ掲示板 - ホーム</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>📝 わかくさ掲示板</h1>
+
+  <!-- 🔍 検索欄 -->
+  <div>
+    <input type="text" id="searchInput" placeholder="スレッド検索..." />
+    <button onclick="searchThreads()">検索</button>
+  </div>
+
+  <!-- 📂 板一覧ページリンク -->
+  <div style="margin-top: 16px;">
+    <button onclick="location.href='boards.html'">📂 板一覧ページを開く</button>
+  </div>
+
+  <script>
+    function searchThreads() {
+      const keyword = document.getElementById('searchInput').value.trim();
+      if (keyword) {
+        location.href = `threads.html?search=${encodeURIComponent(keyword)}`;
+      }
+    }
+  </script>
+</body>
+</html>
