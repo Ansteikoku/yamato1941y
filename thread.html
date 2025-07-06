@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>投稿ページ - わかくさ掲示板</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body {
+      transition: background-color 0.3s ease;
+    }
+    .admin-name {
+      color: orange;
+      font-weight: bold;
+    }
+    .comment {
+      border-bottom: 1px solid #ccc;
+      padding: 8px 0;
+    }
+    .comment .anchor {
+      color: blue;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="thread-title">スレッド</h1>
+
+  <div id="comments">読み込み中...</div>
+
+  <hr />
+
+  <h2>＋ コメント投稿</h2>
+  <form id="comment-form">
+    <input type="text" id="name" placeholder="名前" required />
+    <textarea id="content" placeholder="コメント本文" rows="4" required></textarea><br />
+    <input type="password" id="password" placeholder="削除用パスワード" /><br />
+    <input type="file" id="image" accept="image/*" /><br />
+    <button type="submit">投稿</button>
+  </form>
+
+  <script>
+    const supabase = supabase.createClient(
+      'https://kdhurulrrehrkyrprufl.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkaHVydWxycmVocmt5cnBydWZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3NzA5OTcsImV4cCI6MjA2NzM0Njk5N30.itwj_uK6GgvyhTvenoTHQSNM-ZAKhjkXI9ffqvpbWVI'
+    );
+
+    const urlParams = new URLSearchParams(location.search);
+    const threadId = urlParams.get('thread');
+
+    let threadData = null;
+    let boardSlug = '';
+
+    const boardBgColors = {
+      renraku: '#f0f8ff',
+      kyouka: '#fff0f5',
+      zatsudan: '#f5fff0',
+      ruuru: '#ffffe0'
+    };
+
+    function setBackgroundByBoard(slug) {
+      const color = boardBgColors[slug] || '#fff';
+      document.body.style.backgroundColor = color;
+    }
+
+    async function loadThread() {
+      const { data, error } = await supabase
+        .from('threads')
+        .select('*, board:boards(slug)')
+        .eq('id', threadId)
+        .single();
+
+      if (error || !data) {
+        document.getElementById('thread-title').textContent = 'スレッドが見つかりません';
+        return;
+      }
+
+      threadData = data;
+      boardSlug = data.board.slug;
+      document.getElementById('thread-title').textContent = `スレッド：${data.title}`;
+
+      setBackgroundByBoard(boardSlug);
+
+      loadComments();
+    }
+
+    async function loadComments() {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+
+      const container = document.getElementById('comments');
+      container.innerHTML = '';
+
+      if (error || !data.length) {
+        container.textContent = 'コメントがありません';
+        return;
+      }
+
+      data.forEach((comment, index) => {
+        const div = document.createElement('div');
+        div.className = 'comment';
+        div.id = `comment-${index + 1}`;
+
+        const nameSpan = document.createElement('span');
+        if (comment.name === '管理者') {
+          nameSpan.className = 'admin-name';
+          nameSpan.textContent = comment.name;
+        } else {
+          nameSpan.textContent = comment.name;
+        }
+
+        const date = new Date(comment.created_at);
+        const dateStr = date.toLocaleString();
+
+        let contentHtml = comment.content;
+
+        // アンカー機能（>>数字をリンクに変換）
+        contentHtml = contentHtml.replace(/&gt;&gt;(\\d+)/g, (match, p1) => {
+          return `<a href="#comment-${p1}" class="anchor">&gt;&gt;${p1}</a>`;
+        });
+
+        let imgHtml = '';
+        if (comment.image_url) {
+          imgHtml = `<br><img src="${comment.image_url}" alt="添付画像" style="max-width:200px; max-height:200px;">`;
+        }
+
+        div.innerHTML = `
+          <strong>${nameSpan.outerHTML}</strong> ${dateStr}<br>
+          <span>${contentHtml}</span>
+          ${imgHtml}
+        `;
+
+        container.appendChild(div);
+      });
+    }
+
+    async function uploadImage(file) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `images/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
+
+      if (error) {
+        alert('画像アップロードに失敗しました');
+        return null;
+      }
+
+      const { publicURL } = supabase.storage.from('images').getPublicUrl(filePath);
+      return publicURL;
+    }
+
+    document.getElementById('comment-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const content = document.getElementById('content').value;
+      const password = document.getElementById('password').value;
+      const imageFile = document.getElementById('image').files[0];
+
+      if (!name || !content) {
+        alert('名前とコメントは必須です');
+        return;
+      }
+
+      let imageUrl = null;
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+        if (!imageUrl) return;
+      }
+
+      const { data, error } = await supabase.from('comments').insert([{
+        thread_id: threadId,
+        name: name,
+        content: content,
+        password: password,
+        image_url: imageUrl
+      }]);
+
+      if (error) {
