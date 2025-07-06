@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>板一覧 - わかくさ掲示板</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    a.board-link {
+      display: block;
+      margin: 6px 0;
+      color: blue;
+      font-weight: bold;
+      text-decoration: none;
+    }
+    a.board-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>📂 板一覧</h1>
+  <div id="board-list">読み込み中...</div>
+
+  <script>
+    const supabase = supabase.createClient(
+      'https://kdhurulrrehrkyrprufl.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkaHVydWxycmVocmt5cnBydWZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3NzA5OTcsImV4cCI6MjA2NzM0Njk5N30.itwj_uK6GgvyhTvenoTHQSNM-ZAKhjkXI9ffqvpbWVI'
+    );
+
+    async function loadBoards() {
+      const { data: boards, error } = await supabase
+        .from('boards')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      const container = document.getElementById('board-list');
+      container.innerHTML = '';
+
+      if (error) {
+        container.textContent = '板の読み込みに失敗しました';
+        return;
+      }
+
+      boards.forEach(board => {
+        const link = document.createElement('a');
+        link.href = `threads.html?board=${board.slug}`;
+        link.textContent = `▶ ${board.name}`;
+        link.className = 'board-link';
+        container.appendChild(link);
+      });
+    }
+
+    loadBoards();
+  </script>
+</body>
+</html>
